@@ -106,7 +106,7 @@
           <div class="mini"><h3>Acapella</h3><p>Sem beat. O MC segura o ritmo sozinho. Revela quem tem flow de verdade.</p></div>
           <div class="mini"><h3>2x2 e variações</h3><p>Duplas, perguntas e respostas, rimar em outros ritmos (funk, samba, trap)... cada roda inventa a sua.</p></div>
         </div>
-        <p>Neste site você treina quatro delas: <b>livre</b>, <b>tema</b> (conhecimento), <b>palavras-surpresa</b> e <b>ataque e resposta</b> (o computador manda as barras de sangue e você responde).</p>
+        <p>Neste site você treina: <b>livre</b>, <b>tema</b> (conhecimento), <b>palavras-surpresa</b>, <b>ataque e resposta</b> (o computador manda 4 barras de sangue e você responde) e <b>batalha vs bot</b> (4 voltas de ataque e resposta seguidas, que dá pra jogar até sem microfone).</p>
       </article>
 
       <article class="painel" id="ap-criterios">
@@ -227,9 +227,17 @@
           <label class="modo"><input type="radio" name="modo" value="tema"><span class="modo-icone">🎯</span><b>Tema</b><small>Um tema sorteado, como na batalha de conhecimento.</small></label>
           <label class="modo"><input type="radio" name="modo" value="surpresa"><span class="modo-icone">⚡</span><b>Palavras-surpresa</b><small>Uma palavra nova a cada 2 compassos. Encaixa todas.</small></label>
           <label class="modo"><input type="radio" name="modo" value="ataque"><span class="modo-icone">🥊</span><b>Ataque e resposta</b><small>O computador manda 4 barras de sangue. Você responde.</small></label>
+          <label class="modo"><input type="radio" name="modo" value="batalha"><span class="modo-icone">🏆</span><b>Batalha vs bot</b><small>4 voltas: o bot ataca, você responde. Dá pra jogar sem microfone.</small></label>
         </div>
 
         <div class="painel config">
+          <div class="campo">
+            <label for="cfg-microfone">Microfone</label>
+            <select id="cfg-microfone">
+              <option value="sim">Com microfone (dá nota)</option>
+              <option value="nao">Sem microfone (só treino)</option>
+            </select>
+          </div>
           <div class="campo">
             <label for="cfg-estilo">Beat</label>
             <select id="cfg-estilo"></select>
@@ -238,7 +246,15 @@
             <label for="cfg-bpm">Velocidade: <b id="cfg-bpm-valor">90</b> BPM</label>
             <input type="range" id="cfg-bpm" min="70" max="160" value="90">
           </div>
-          <div class="campo">
+          <div class="campo" id="campo-compassos" hidden>
+            <label for="cfg-compassos">Sua vez em cada volta</label>
+            <select id="cfg-compassos">
+              <option value="4">4 compassos (curta)</option>
+              <option value="8" selected>8 compassos</option>
+              <option value="16">16 compassos (longa)</option>
+            </select>
+          </div>
+          <div class="campo" id="campo-duracao">
             <label for="cfg-duracao">Duração</label>
             <select id="cfg-duracao">
               <option value="30">30 segundos</option>
@@ -252,7 +268,7 @@
             <label for="cfg-volume">Volume do beat</label>
             <input type="range" id="cfg-volume" min="0" max="100" value="70">
           </div>
-          <div class="campo">
+          <div class="campo" id="campo-motor">
             <label for="cfg-motor">Reconhecimento de voz</label>
             <select id="cfg-motor">
               <option value="navegador">Navegador (tempo real)</option>

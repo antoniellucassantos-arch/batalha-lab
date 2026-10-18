@@ -37,4 +37,4 @@ export function recorde(chave, valor) {
   return { novo: false, valor: atual };
 }
 
-export const NOMES_MODO = { livre: 'Livre', tema: 'Tema', surpresa: 'Palavras-surpresa', ataque: 'Ataque e resposta' };
+export const NOMES_MODO = { livre: 'Livre', tema: 'Tema', surpresa: 'Palavras-surpresa', ataque: 'Ataque e resposta', batalha: 'Batalha vs bot' };

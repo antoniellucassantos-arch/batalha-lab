@@ -17,7 +17,7 @@ Abrir o `index.html` direto (file://) não funciona: o navegador bloqueia módul
 | Página | O que faz |
 |---|---|
 | **Aprender** | Como a batalha funciona, modalidades, o que o público avalia, técnicas, plano de 4 semanas e glossário. |
-| **Treinar** | Rodadas com beat (boom bap, trap, lo-fi, acapella). Modos: livre, tema sorteado, palavras-surpresa e ataque e resposta contra o computador. Nota de 0 a 100 em Rima, Complexidade, Vocabulário, Flow e Desafio. A gravação fica disponível para ouvir de novo. |
+| **Treinar** | Rodadas com beat (boom bap, trap, lo-fi, acapella). Modos: livre, tema sorteado, palavras-surpresa, ataque e resposta, e **batalha vs bot** (4 voltas: o bot ataca em voz alta, você responde por 4, 8 ou 16 compassos). Tudo funciona também **sem microfone**: você rima em voz alta e, se quiser nota, digita depois o que lembrar. Nota de 0 a 100 em Rima, Complexidade, Vocabulário, Flow e Desafio. A gravação fica disponível para ouvir de novo. |
 | **Exercícios** | Corrente de rimas, completa a barra, caça multissilábica e associação livre. Por voz ou digitando. |
 | **Laboratório** | Dicionário de rimas pelo som (perfeitas, variações, toantes e multis) e analisador que colore as rimas de qualquer letra. |
 | **Progresso** | Histórico, gráfico de evolução, médias por critério e recordes (salvos no navegador). |

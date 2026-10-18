@@ -106,13 +106,28 @@ export function avaliarRodada({ barras, duracaoSeg = 0, travadas = 0, modo = 'li
   nota = Math.round(nota);
   const dims = Object.fromEntries(Object.entries(dims01).map(([k, v]) => [k, Math.round(v * 100)]));
 
-  // Dicas para as duas dimensões mais fracas
+  return { nota, rotulo: rotuloNota(nota), dims, dicas: gerarDicas(dims, modo), detalhes, analise, ppm };
+}
+
+// Dicas para as duas dimensões mais fracas
+export function gerarDicas(dims, modo) {
   const fracas = Object.entries(dims).sort((a, b) => a[1] - b[1]).slice(0, 2).map(([k]) => k);
-  const DICA_DESAFIO = { tema: 0, surpresa: 1, ataque: 2 };
-  const dicas = fracas.map((k) => {
+  const DICA_DESAFIO = { tema: 0, surpresa: 1, ataque: 2, batalha: 2 };
+  return fracas.map((k) => {
     const i = k === 'desafio' && modo in DICA_DESAFIO ? DICA_DESAFIO[modo] : Math.floor(Math.random() * DICAS[k].length);
     return { dim: DIMENSOES[k], texto: DICAS[k][i] };
   });
+}
 
-  return { nota, rotulo: rotuloNota(nota), dims, dicas, detalhes, analise, ppm };
+// Junta as notas de várias voltas (batalha) numa nota geral
+export function combinarVoltas(resultados, modo) {
+  const media = (f) => resultados.reduce((s, r) => s + f(r), 0) / resultados.length;
+  const dims = Object.fromEntries(Object.keys(DIMENSOES).map((k) => [k, Math.round(media((r) => r.dims[k]))]));
+  const nota = Math.round(media((r) => r.nota));
+  const comPpm = resultados.filter((r) => r.ppm);
+  return {
+    nota, rotulo: rotuloNota(nota), dims, dicas: gerarDicas(dims, modo), detalhes: [],
+    ppm: comPpm.length ? comPpm.reduce((s, r) => s + r.ppm, 0) / comPpm.length : null,
+    analise: analisarTexto(resultados.flatMap((r) => r.analise.linhas.map((l) => l.texto))),
+  };
 }

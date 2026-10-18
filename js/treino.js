@@ -1,8 +1,9 @@
 // Página "Treinar": rodada de freestyle com beat, voz, estímulos e nota final.
+// Uma rodada tem uma ou mais "voltas". Na batalha vs bot são 4: o bot ataca, você responde.
 import { Beat, ESTILOS } from './beat.js';
 import { VozNavegador, Gravador, Whisper, MODELOS_WHISPER, temWebSpeech, temMicrofone, blobParaAudio16k, segmentosParaBarras, falar } from './voz.js';
 import { analisarTexto, renderizarAnalise, escapar } from './rima.js';
-import { avaliarRodada, DIMENSOES } from './avaliacao.js';
+import { avaliarRodada, combinarVoltas, DIMENSOES } from './avaliacao.js';
 import { carregarDicionario } from './dicionario.js';
 import { TEMAS, PALAVRAS_SURPRESA, ATAQUES } from './dados.js';
 import * as juiz from './juiz.js';
@@ -11,6 +12,9 @@ import { $, $$, sortear, formatarTempo, ler, salvar, salvarRodada, NOMES_MODO } 
 const beat = new Beat();
 const whisper = new Whisper();
 let rodada = null;
+
+const MODOS_COM_BOT = new Set(['ataque', 'batalha']);
+const VOLTAS_BATALHA = 4;
 
 // ?simular na URL: roda sem microfone, com barras faladas de mentira (para testar o site)
 const SIMULAR = new URLSearchParams(location.search).has('simular');
@@ -22,15 +26,16 @@ class GravadorSimulado {
 }
 class VozSimulada {
   constructor({ aoAtualizar }) { this.aoAtualizar = aoAtualizar; this.segs = []; }
-  iniciar() {
+  iniciar(origem) {
     const falas = ['eu cheguei na roda pra mostrar meu talento', 'minha rima é pesada igual ao cimento', 'tu fala de relógio mas não tem o tempo',
       'eu sou a tempestade e tu é só o vento', 'isso aqui é batalha de rima', 'e eu sou a navalha que mira', 'teu flow é fraco, cadê o chinelo', 'eu rimo no beat e tu rima no espelho'];
     let i = 0;
     this.t = setInterval(() => {
-      if (i >= falas.length) return;
-      this.segs = [...this.segs, { texto: falas[i], ini: i * 2600, fim: i * 2600 + 2200 }];
+      if (!rodada || rodada.fase !== 'rodando') return;
+      const agora = performance.now() - origem;
+      this.segs = [...this.segs, { texto: falas[i % falas.length], ini: agora - 2200, fim: agora }];
       i++;
-      this.aoAtualizar(this.segs, i < falas.length ? '…' : '');
+      this.aoAtualizar(this.segs, '');
     }, 2600);
   }
   parar() { clearInterval(this.t); return Promise.resolve(this.segs); }
@@ -51,9 +56,11 @@ function aviso(msg) {
 function lerConfig() {
   return {
     modo: $('input[name=modo]:checked').value,
+    microfone: $('#cfg-microfone').value,
     estilo: $('#cfg-estilo').value,
     bpm: Number($('#cfg-bpm').value),
     duracao: Number($('#cfg-duracao').value),
+    compassos: Number($('#cfg-compassos').value),
     volume: Number($('#cfg-volume').value) / 100,
     motor: $('#cfg-motor').value,
     whisper: $('#cfg-whisper').value,
@@ -64,21 +71,30 @@ function aplicarConfig(c) {
   if (!c) return;
   const radio = $(`input[name=modo][value="${c.modo}"]`);
   if (radio) radio.checked = true;
+  if (c.microfone) $('#cfg-microfone').value = c.microfone;
   if (c.estilo && ESTILOS[c.estilo]) $('#cfg-estilo').value = c.estilo;
   if (c.bpm) $('#cfg-bpm').value = c.bpm;
   if (c.duracao) $('#cfg-duracao').value = c.duracao;
+  if (c.compassos) $('#cfg-compassos').value = c.compassos;
   if (c.volume !== undefined) $('#cfg-volume').value = Math.round(c.volume * 100);
   if (c.motor) $('#cfg-motor').value = c.motor;
   if (c.whisper) $('#cfg-whisper').value = c.whisper;
 }
 
-function atualizarCamposMotor() {
+function atualizarCampos() {
+  const semMic = $('#cfg-microfone').value === 'nao';
   const motor = $('#cfg-motor').value;
-  $('#campo-whisper').hidden = motor !== 'whisper';
-  if (motor === 'navegador' && !temWebSpeech) {
-    aviso('Seu navegador não tem reconhecimento de voz em tempo real. Use <b>Chrome</b> ou <b>Edge</b>, ou escolha <b>Whisper offline</b>.');
+  const modo = $('input[name=modo]:checked').value;
+  $('#campo-motor').hidden = semMic;
+  $('#campo-whisper').hidden = semMic || motor !== 'whisper';
+  $('#campo-duracao').hidden = modo === 'batalha';
+  $('#campo-compassos').hidden = modo !== 'batalha';
+  if (semMic) {
+    aviso('<b>Sem microfone:</b> o beat, o tempo e os ataques do bot rolam normal e você rima em voz alta. No final, se quiser nota, digite o que lembrar. Dica: se o fone não tem microfone, o microfone do celular ou do notebook funciona mesmo com o som indo pro fone.');
+  } else if (motor === 'navegador' && !temWebSpeech) {
+    aviso('Seu navegador não tem reconhecimento de voz em tempo real. Use <b>Chrome</b> ou <b>Edge</b>, escolha <b>Whisper</b> ou jogue <b>sem microfone</b>.');
   } else if (motor === 'whisper') {
-    aviso('O Whisper roda no seu computador. Na primeira vez ele baixa o modelo (fica salvo no navegador) e a transcrição sai quando a rodada termina.');
+    aviso('O Whisper roda no seu aparelho. Na primeira vez ele baixa o modelo (fica salvo no navegador) e a transcrição sai quando a rodada termina.');
   } else {
     aviso('');
   }
@@ -89,7 +105,6 @@ export function iniciarTreino() {
   selEstilo.innerHTML = Object.entries(ESTILOS).map(([k, e]) => `<option value="${k}">${e.nome} · ${e.bpm} BPM</option>`).join('');
   $('#cfg-whisper').innerHTML = MODELOS_WHISPER.map((m) => `<option value="${m.id}">${m.nome}</option>`).join('');
   $('#cfg-whisper').value = MODELOS_WHISPER[1].id;
-  if (!temWebSpeech) $('#cfg-motor').value = 'whisper';
 
   aplicarConfig(ler('config', null));
   if (!temWebSpeech) $('#cfg-motor').value = 'whisper';
@@ -101,8 +116,9 @@ export function iniciarTreino() {
   });
   $('#cfg-bpm').addEventListener('input', (e) => { $('#cfg-bpm-valor').textContent = e.target.value; });
   $('#cfg-volume').addEventListener('input', (e) => beat.setVolume(Number(e.target.value) / 100));
-  $('#cfg-motor').addEventListener('change', atualizarCamposMotor);
-  atualizarCamposMotor();
+  ['#cfg-motor', '#cfg-microfone'].forEach((s) => $(s).addEventListener('change', atualizarCampos));
+  $$('input[name=modo]').forEach((r) => r.addEventListener('change', atualizarCampos));
+  atualizarCampos();
 
   $('#btn-comecar').addEventListener('click', () => comecar());
   $('#btn-parar').addEventListener('click', () => encerrar(false));
@@ -114,36 +130,48 @@ export function iniciarTreino() {
 async function comecar(cfgForcada) {
   const cfg = cfgForcada || lerConfig();
   salvar('config', cfg);
-  if (!temMicrofone && !SIMULAR) { aviso('Este navegador não dá acesso ao microfone. Abra o site pelo <b>iniciar.bat</b> (http://localhost) no Chrome ou Edge.'); return; }
-  if (cfg.motor === 'navegador' && !temWebSpeech && !SIMULAR) { atualizarCamposMotor(); return; }
+  const comMic = cfg.microfone !== 'nao';
+  if (comMic && !SIMULAR) {
+    if (!temMicrofone) { aviso('Este navegador não dá acesso ao microfone. Abra pelo link https do site ou pelo <b>iniciar.bat</b>, ou escolha <b>Sem microfone</b>.'); return; }
+    if (cfg.motor === 'navegador' && !temWebSpeech) { atualizarCampos(); return; }
+  }
 
+  const batalha = cfg.modo === 'batalha';
+  const nVoltas = batalha ? VOLTAS_BATALHA : 1;
+  const ataques = MODOS_COM_BOT.has(cfg.modo) ? [...ATAQUES].sort(() => Math.random() - 0.5).slice(0, nVoltas) : [];
   rodada = {
     id: Date.now(),
     cfg,
     modo: cfg.modo,
+    comMic,
     fase: 'preparando',
-    inicioMs: null,
+    origemMs: null, // início da primeira resposta: referência dos tempos da voz
     compassoInicio: null,
     segmentos: [],
     palavrasMostradas: [],
     encerrando: false,
+    voltas: Array.from({ length: nVoltas }, (_, i) => ({ ataque: ataques[i] || null, ini: null, fim: null })),
+    volta: 0,
+    duracaoResposta: batalha ? cfg.compassos * (240 / cfg.bpm) : cfg.duracao,
   };
 
-  const gravador = SIMULAR ? new GravadorSimulado() : new Gravador();
-  try {
-    await gravador.abrir();
-  } catch (err) {
-    aviso('Não consegui acessar o microfone. Clique no cadeado da barra de endereço e permita o microfone para este site.');
-    return;
+  if (comMic) {
+    const gravador = SIMULAR ? new GravadorSimulado() : new Gravador();
+    try {
+      await gravador.abrir();
+    } catch (err) {
+      aviso('Não consegui acessar o microfone. Permita o microfone no cadeado da barra de endereço, ou escolha <b>Sem microfone</b>.');
+      rodada = null;
+      return;
+    }
+    rodada.gravador = gravador;
   }
-  rodada.gravador = gravador;
 
   mostrarEtapa('treino-palco');
-  $('#relogio').textContent = formatarTempo(cfg.duracao);
+  $('#relogio').textContent = formatarTempo(rodada.duracaoResposta);
   $('#relogio').classList.remove('acabando');
-  $('#ao-vivo').innerHTML = cfg.motor === 'whisper'
-    ? '<p class="placeholder">Gravando… com o Whisper a transcrição aparece quando a rodada terminar.</p>'
-    : '<p class="placeholder">A transcrição aparece aqui enquanto você rima…</p>';
+  $('.medidor').hidden = !comMic;
+  placeholderAoVivo();
   $('#info-compasso').textContent = 'preparando';
   $('#contagem').hidden = true;
   prepararEstimulo();
@@ -153,15 +181,21 @@ async function comecar(cfgForcada) {
   beat.setVolume(cfg.volume);
   beat.aoTempo = aoTempo;
   await beat.iniciar();
-
-  if (cfg.modo === 'ataque') {
-    rodada.fase = 'cpu';
-    lancarAtaque();
-  } else {
-    rodada.fase = 'contagem';
-    rodada.compassoInicio = 1;
-  }
+  proximaVolta();
   animar();
+}
+
+function placeholderAoVivo() {
+  const r = rodada;
+  $('#ao-vivo').innerHTML = !r.comMic
+    ? '<p class="placeholder">Sem microfone: rima em voz alta! Quando acabar, dá pra digitar o que lembrar e ganhar nota.</p>'
+    : r.cfg.motor === 'whisper' && !SIMULAR
+      ? '<p class="placeholder">Gravando… com o Whisper a transcrição aparece quando a rodada terminar.</p>'
+      : '<p class="placeholder">A transcrição aparece aqui enquanto você rima…</p>';
+}
+
+function rotuloVolta() {
+  return rodada.voltas.length > 1 ? `Volta ${rodada.volta + 1}/${rodada.voltas.length} · ` : '';
 }
 
 function prepararEstimulo() {
@@ -174,29 +208,48 @@ function prepararEstimulo() {
   } else if (m === 'surpresa') {
     rodada.fila = [...PALAVRAS_SURPRESA].sort(() => Math.random() - 0.5);
     el.innerHTML = '<div class="rotulo">Palavra-surpresa</div><div class="grande" id="palavra-surpresa">prepare-se</div><div class="chips" id="surpresas-anteriores"></div>';
-  } else if (m === 'ataque') {
-    rodada.ataque = sortear(ATAQUES);
-    el.innerHTML = `<div class="rotulo">O computador ataca</div><div class="ataque-cpu">${rodada.ataque.map((b) => `<p>${escapar(b)}</p>`).join('')}</div>`;
-  } else {
+  } else if (m === 'livre') {
     el.innerHTML = '<div class="rotulo">Modo livre</div>';
+  } else {
+    el.innerHTML = '';
   }
 }
 
-async function lancarAtaque() {
+function proximaVolta() {
+  const v = rodada.voltas[rodada.volta];
+  $('#relogio').textContent = formatarTempo(rodada.duracaoResposta);
+  $('#relogio').classList.remove('acabando');
+  if (v.ataque) {
+    rodada.fase = 'cpu';
+    $('#estimulo').innerHTML = `<div class="rotulo" id="rotulo-ataque">${rotuloVolta()}O bot ataca</div>
+      <div class="ataque-cpu">${v.ataque.map((b) => `<p>${escapar(b)}</p>`).join('')}</div>`;
+    $('#info-compasso').textContent = rotuloVolta() + 'vez do bot';
+    if (rodada.volta > 0) placeholderAoVivo();
+    lancarAtaque(v.ataque);
+  } else {
+    rodada.fase = 'contagem';
+    rodada.compassoInicio = beat.compasso + 1;
+  }
+}
+
+async function lancarAtaque(ataque) {
+  const r = rodada;
   const linhas = $$('.ataque-cpu p');
   const comVoz = 'speechSynthesis' in window;
-  beat.setVolume(rodada.cfg.volume * 0.45);
-  for (let i = 0; i < rodada.ataque.length; i++) {
-    if (!rodada || rodada.encerrando) return;
+  beat.setVolume(r.cfg.volume * 0.45);
+  for (let i = 0; i < ataque.length; i++) {
+    if (rodada !== r || r.encerrando) return;
     linhas[i]?.classList.add('lida');
-    if (comVoz) await falar(rodada.ataque[i]);
-    else await new Promise((r) => setTimeout(r, beat.segPorCompasso * 1000));
+    if (comVoz) await falar(ataque[i]);
+    else await new Promise((res) => setTimeout(res, beat.segPorCompasso * 1000));
   }
-  if (!rodada || rodada.encerrando) return;
-  beat.setVolume(rodada.cfg.volume);
+  if (rodada !== r || r.encerrando) return;
+  beat.setVolume(r.cfg.volume);
+  const rot = $('#rotulo-ataque');
+  if (rot) rot.textContent = rotuloVolta() + 'Sua vez! Responde o bot';
   // contagem no próximo compasso e resposta no seguinte
-  rodada.compassoInicio = beat.compasso + 2;
-  rodada.fase = 'contagem';
+  r.compassoInicio = beat.compasso + 2;
+  r.fase = 'contagem';
 }
 
 function aoTempo({ tempo, compasso }) {
@@ -209,42 +262,67 @@ function aoTempo({ tempo, compasso }) {
     const c = $('#contagem');
     c.hidden = false;
     c.textContent = String(4 - tempo);
-    $('#info-compasso').textContent = 'prepare-se';
+    $('#info-compasso').textContent = rotuloVolta() + 'prepare-se';
   }
   if (rodada.fase === 'contagem' && compasso >= rodada.compassoInicio && tempo === 0) iniciarResposta();
   if (rodada.fase === 'rodando') {
     const n = compasso - rodada.compassoInicio;
-    $('#info-compasso').textContent = `compasso ${n + 1}`;
+    const total = rodada.modo === 'batalha' ? `/${rodada.cfg.compassos}` : '';
+    $('#info-compasso').textContent = `${rotuloVolta()}sua vez · compasso ${n + 1}${total}`;
     if (rodada.modo === 'surpresa' && tempo === 0 && n % 2 === 0) novaSurpresa();
   }
 }
 
 function iniciarResposta() {
-  rodada.fase = 'rodando';
-  rodada.inicioMs = performance.now();
-  $('#contagem').hidden = true;
-  rodada.gravador.gravar();
-  if (rodada.cfg.motor === 'navegador' || SIMULAR) {
-    rodada.voz = new (SIMULAR ? VozSimulada : VozNavegador)({
-      aoAtualizar: (segs, interino) => { rodada.segmentos = segs; renderAoVivo(segs, interino); },
-      aoErro: (erro) => {
-        const msgs = {
-          network: 'O reconhecimento do navegador precisa de internet. Sem conexão? Use o modo Whisper offline.',
-          'not-allowed': 'Permissão de microfone negada para o reconhecimento de voz.',
-          'audio-capture': 'Nenhum microfone encontrado.',
-          'language-not-supported': 'Este navegador não reconhece português. Use o Chrome ou o modo Whisper.',
-        };
-        $('#ao-vivo').insertAdjacentHTML('afterbegin', `<p class="aviso">${msgs[erro] || 'Erro no reconhecimento: ' + escapar(erro)}</p>`);
-      },
-    });
-    rodada.voz.iniciar(rodada.inicioMs);
+  const r = rodada;
+  r.fase = 'rodando';
+  const agora = performance.now();
+  if (r.origemMs === null) {
+    r.origemMs = agora;
+    if (r.comMic) {
+      r.gravador.gravar();
+      if (r.cfg.motor === 'navegador' || SIMULAR) {
+        r.voz = new (SIMULAR ? VozSimulada : VozNavegador)({
+          aoAtualizar: (segs, interino) => {
+            r.segmentos = segs;
+            if (r.fase !== 'rodando') return;
+            const v = r.voltas[r.volta];
+            renderAoVivo(segs.filter((s) => s.ini >= v.ini - 600), interino);
+          },
+          aoErro: (erro) => {
+            const msgs = {
+              network: 'O reconhecimento do navegador precisa de internet. Sem conexão? Use o modo Whisper ou jogue sem microfone.',
+              'not-allowed': 'Permissão de microfone negada para o reconhecimento de voz.',
+              'audio-capture': 'Nenhum microfone encontrado. Escolha "Sem microfone" na configuração.',
+              'language-not-supported': 'Este navegador não reconhece português. Use o Chrome ou o modo Whisper.',
+            };
+            $('#ao-vivo').insertAdjacentHTML('afterbegin', `<p class="aviso">${msgs[erro] || 'Erro no reconhecimento: ' + escapar(erro)}</p>`);
+          },
+        });
+        r.voz.iniciar(r.origemMs);
+      }
+    }
   }
-  rodada.timer = setInterval(() => {
-    const restante = rodada.cfg.duracao - (performance.now() - rodada.inicioMs) / 1000;
+  const v = r.voltas[r.volta];
+  v.ini = agora - r.origemMs;
+  v.inicioPerf = agora;
+  $('#contagem').hidden = true;
+  clearInterval(r.timer);
+  r.timer = setInterval(() => {
+    const restante = r.duracaoResposta - (performance.now() - v.inicioPerf) / 1000;
     $('#relogio').textContent = formatarTempo(restante);
     $('#relogio').classList.toggle('acabando', restante <= 5);
-    if (restante <= 0) encerrar(false);
+    if (restante <= 0) fimResposta();
   }, 100);
+}
+
+function fimResposta() {
+  const r = rodada;
+  clearInterval(r.timer);
+  r.voltas[r.volta].fim = performance.now() - r.origemMs;
+  r.volta++;
+  if (r.volta >= r.voltas.length) { encerrar(false); return; }
+  proximaVolta();
 }
 
 function novaSurpresa() {
@@ -253,7 +331,7 @@ function novaSurpresa() {
   const el = $('#palavra-surpresa');
   const ant = rodada.palavrasMostradas[rodada.palavrasMostradas.length - 1];
   if (ant) $('#surpresas-anteriores').insertAdjacentHTML('beforeend', `<span class="chip">${escapar(ant.palavra)}</span>`);
-  rodada.palavrasMostradas.push({ palavra: w, t: performance.now() - rodada.inicioMs });
+  rodada.palavrasMostradas.push({ palavra: w, t: performance.now() - rodada.origemMs });
   el.textContent = w;
   el.classList.remove('nova');
   void el.offsetWidth;
@@ -288,6 +366,31 @@ function contarTravadas(segs, duracaoMs) {
   return t;
 }
 
+async function transcreverWhisper(blob, r) {
+  try {
+    $('#processando-texto').textContent = 'Preparando o Whisper…';
+    const audio = await blobParaAudio16k(blob);
+    const res = await whisper.transcrever(audio, r.cfg.whisper, (p) => {
+      if (p.status === 'progress' && p.total) {
+        $('#processando-texto').textContent = `Baixando modelo (só na primeira vez): ${p.file || ''}`;
+        $('#processando-barra').style.width = Math.round(p.progress || 0) + '%';
+      } else if (p.status === 'transcrevendo') {
+        $('#processando-texto').textContent = 'Transcrevendo sua voz com o Whisper…';
+        $('#processando-barra').style.width = '90%';
+      }
+    });
+    const fimTotal = r.voltas[r.voltas.length - 1].fim / 1000;
+    return (res.chunks.length ? res.chunks : [{ text: res.texto, timestamp: [0, fimTotal] }])
+      // o Whisper às vezes escreve [música], (risos) etc. no silêncio
+      .map((c) => ({ texto: c.text.replace(/\[[^\]]*\]|\([^)]*\)|♪/g, '').trim(), ini: (c.timestamp?.[0] ?? 0) * 1000, fim: (c.timestamp?.[1] ?? fimTotal) * 1000 }))
+      .filter((s) => s.texto);
+  } catch (err) {
+    console.error(err);
+    $('#processando-texto').textContent = 'O Whisper falhou: ' + err.message;
+    return [];
+  }
+}
+
 async function encerrar(cancelado) {
   if (!rodada || rodada.encerrando) return;
   const r = rodada;
@@ -295,12 +398,16 @@ async function encerrar(cancelado) {
   clearInterval(r.timer);
   cancelAnimationFrame(r.raf);
   if ('speechSynthesis' in window) speechSynthesis.cancel();
-  const duracaoMs = r.inicioMs ? performance.now() - r.inicioMs : 0;
   beat.parar();
 
-  if (cancelado || !r.inicioMs) {
+  // fecha a volta que estava rolando quando apertou "Parar"
+  const atual = r.voltas[r.volta];
+  if (atual && atual.ini !== null && atual.fim === null) atual.fim = performance.now() - r.origemMs;
+  r.voltas = r.voltas.filter((v) => v.ini !== null && v.fim !== null);
+
+  if (cancelado || !r.voltas.length) {
     r.voz?.cancelar();
-    await r.gravador.parar();
+    await r.gravador?.parar();
     rodada = null;
     mostrarEtapa('treino-config');
     return;
@@ -311,71 +418,72 @@ async function encerrar(cancelado) {
   $('#processando-barra').style.width = '10%';
 
   let segmentos = r.voz ? await r.voz.parar() : [];
-  const blob = await r.gravador.parar();
-
-  if (r.cfg.motor === 'whisper' && !SIMULAR) {
-    try {
-      $('#processando-texto').textContent = 'Preparando o Whisper…';
-      const audio = await blobParaAudio16k(blob);
-      const res = await whisper.transcrever(audio, r.cfg.whisper, (p) => {
-        if (p.status === 'progress' && p.total) {
-          $('#processando-texto').textContent = `Baixando modelo (só na primeira vez): ${p.file || ''}`;
-          $('#processando-barra').style.width = Math.round(p.progress || 0) + '%';
-        } else if (p.status === 'transcrevendo') {
-          $('#processando-texto').textContent = 'Transcrevendo sua voz com o Whisper…';
-          $('#processando-barra').style.width = '90%';
-        }
-      });
-      segmentos = (res.chunks.length ? res.chunks : [{ text: res.texto, timestamp: [0, duracaoMs / 1000] }])
-        // o Whisper às vezes escreve [música], (risos) etc. no silêncio
-        .map((c) => ({ texto: c.text.replace(/\[[^\]]*\]|\([^)]*\)|♪/g, '').trim(), ini: (c.timestamp?.[0] ?? 0) * 1000, fim: (c.timestamp?.[1] ?? duracaoMs / 1000) * 1000 }))
-        .filter((s) => s.texto);
-    } catch (err) {
-      console.error(err);
-      $('#processando-texto').textContent = 'O Whisper falhou: ' + err.message;
-      segmentos = [];
-    }
-  }
+  const blob = r.gravador ? await r.gravador.parar() : null;
+  if (r.comMic && r.cfg.motor === 'whisper' && !SIMULAR && blob) segmentos = await transcreverWhisper(blob, r);
 
   $('#processando-texto').textContent = 'Analisando suas rimas…';
   $('#processando-barra').style.width = '100%';
   await Promise.race([carregarDicionario(), new Promise((res) => setTimeout(res, 3000))]);
 
-  r.barras = barrasDe(segmentos);
-  r.duracaoSeg = duracaoMs / 1000;
-  r.travadas = contarTravadas(segmentos, duracaoMs);
+  // cada fala vai para a volta em que começou; o que caiu na vez do bot é descartado
+  for (const v of r.voltas) {
+    const segs = segmentos
+      .filter((s) => s.ini >= v.ini - 600 && s.ini < v.fim + 300)
+      .map((s) => ({ ...s, ini: Math.max(0, s.ini - v.ini), fim: s.fim - v.ini }));
+    v.barras = barrasDe(segs);
+    v.duracaoSeg = (v.fim - v.ini) / 1000;
+    v.travadas = r.comMic ? contarTravadas(segs, v.fim - v.ini) : 0;
+  }
   r.audioUrl = blob ? URL.createObjectURL(blob) : null;
   rodada = null;
   avaliarEExibir(r);
 }
 
-function extrasDe(r) {
+function extrasDe(r, v) {
   return {
     tema: r.tema?.tema,
     palavrasTema: r.tema?.palavras,
     // a última palavra só conta se apareceu pelo menos 1 compasso antes do fim
-    palavrasMostradas: (r.palavrasMostradas || []).filter((p) => p.t < r.duracaoSeg * 1000 - beat.segPorCompasso * 1000).map((p) => p.palavra),
-    ataque: r.ataque,
+    palavrasMostradas: (r.palavrasMostradas || []).filter((p) => p.t < v.duracaoSeg * 1000 - beat.segPorCompasso * 1000).map((p) => p.palavra),
+    ataque: v.ataque,
   };
 }
 
 function avaliarEExibir(r) {
-  const extras = extrasDe(r);
-  const res = avaliarRodada({ barras: r.barras, duracaoSeg: r.duracaoSeg, travadas: r.travadas, modo: r.modo, extras });
-  r.resultado = res;
-  salvarRodada({
-    id: r.id,
-    data: r.id,
-    modo: r.modo,
-    nota: res.nota,
-    dims: res.dims,
-    barras: r.barras,
-    duracao: Math.round(r.duracaoSeg),
-    estilo: r.cfg.estilo,
-    bpm: r.cfg.bpm,
-    contexto: r.tema?.tema || '',
-  });
-  renderResultado(r, res, extras);
+  for (const v of r.voltas) {
+    v.extras = extrasDe(r, v);
+    v.resultado = v.barras.length
+      ? avaliarRodada({
+        barras: v.barras,
+        // sem microfone o texto foi digitado depois, então não dá pra medir velocidade
+        duracaoSeg: r.comMic ? v.duracaoSeg : 0,
+        travadas: v.travadas,
+        modo: v.ataque ? 'ataque' : r.modo,
+        extras: v.extras,
+      })
+      : null;
+  }
+  const avaliadas = r.voltas.filter((v) => v.resultado);
+  const geral = !avaliadas.length ? null
+    : r.voltas.length === 1 ? avaliadas[0].resultado
+    : combinarVoltas(avaliadas.map((v) => v.resultado), r.modo);
+  r.geral = geral;
+  if (geral) {
+    salvarRodada({
+      id: r.id,
+      data: r.id,
+      modo: r.modo,
+      nota: geral.nota,
+      dims: geral.dims,
+      barras: r.voltas.flatMap((v) => v.barras),
+      duracao: Math.round(r.voltas.reduce((s, v) => s + v.duracaoSeg, 0)),
+      estilo: r.cfg.estilo,
+      bpm: r.cfg.bpm,
+      contexto: r.tema?.tema || (r.modo === 'batalha' ? `${r.voltas.length} voltas` : ''),
+      semMic: !r.comMic,
+    });
+  }
+  renderResultado(r, geral);
 }
 
 function anel(nota) {
@@ -389,72 +497,95 @@ function anel(nota) {
   </svg>`;
 }
 
-function renderResultado(r, res, extras) {
-  const s = res.analise.stats;
-  const el = $('#treino-resultado');
-  const vazio = !r.barras.length;
-  const contexto = r.modo === 'tema' ? `Tema: <b>${escapar(r.tema.tema)}</b>`
-    : r.modo === 'surpresa' ? `Palavras: ${extras.palavrasMostradas.map((p) => `<span class="chip ${extras.palavrasUsadas?.includes(p) ? 'usada' : ''}">${escapar(p)}</span>`).join(' ')}`
-    : r.modo === 'ataque' ? 'Ataque do computador:' : '';
+function tituloRodada(r) {
+  const tempo = r.voltas.reduce((s, v) => s + v.duracaoSeg, 0);
+  const base = r.modo === 'batalha'
+    ? `${NOMES_MODO[r.modo]} · ${r.voltas.length} ${r.voltas.length === 1 ? 'volta' : 'voltas'} de ${r.cfg.compassos} compassos`
+    : `${NOMES_MODO[r.modo]} · ${formatarTempo(tempo)}`;
+  return `${base} · ${escapar(r.cfg.bpm)} BPM${r.comMic ? '' : ' · sem microfone'}`;
+}
 
-  el.innerHTML = `
+function painelTopo(r, geral) {
+  if (!geral) {
+    return r.comMic
+      ? `<div class="painel"><h2>${tituloRodada(r)}</h2><p class="aviso">Não ouvi nada. Confira se o microfone certo está selecionado, fale mais perto dele, tente o modo Whisper, ou digite abaixo o que você rimou.</p></div>`
+      : `<div class="painel"><h2>🎤 ${r.modo === 'batalha' ? 'Batalha concluída!' : 'Rodada concluída!'}</h2>
+          <p>${tituloRodada(r)}. Sem microfone, ninguém ouviu, então quem julga é você.</p>
+          <p class="nota-rodape">Quer nota? Digite o que lembrar de cada ${r.voltas.length > 1 ? 'volta' : 'rodada'} (uma barra por linha) e aperte <b>Avaliar</b>. O site mostra as rimas e se você respondeu na rima do bot.</p></div>`;
+  }
+  const s = geral.analise.stats;
+  return `
     <div class="painel">
       <div class="resultado-topo">
-        <div class="nota-circulo">${anel(res.nota)}<div class="valor"><b>${res.nota}</b><span>${escapar(res.rotulo)}</span></div></div>
+        <div class="nota-circulo">${anel(geral.nota)}<div class="valor"><b>${geral.nota}</b><span>${escapar(geral.rotulo)}</span></div></div>
         <div>
-          <h2>${NOMES_MODO[r.modo]} · ${formatarTempo(r.duracaoSeg)} · ${escapar(r.cfg.bpm)} BPM</h2>
-          <div class="dims">${Object.entries(res.dims).map(([k, v]) => `
+          <h2>${tituloRodada(r)}</h2>
+          <div class="dims">${Object.entries(geral.dims).map(([k, v]) => `
             <div class="dim"><span class="dim-nome">${DIMENSOES[k]}</span><div class="dim-barra"><span data-w="${v}"></span></div><span class="dim-valor">${v}</span></div>`).join('')}
           </div>
           <div class="chips" style="margin-top:16px">
             <span class="chip"><b>${s.barras}</b> barras</span>
             <span class="chip"><b>${s.palavras}</b> palavras</span>
-            ${res.ppm ? `<span class="chip"><b>${Math.round(res.ppm)}</b> palavras/min</span>` : ''}
+            ${geral.ppm ? `<span class="chip"><b>${Math.round(geral.ppm)}</b> palavras/min</span>` : ''}
             <span class="chip"><b>${s.barrasComRima}</b> barras rimando</span>
             <span class="chip"><b>${s.perfeitas}</b> perfeitas · <b>${s.toantes}</b> toantes</span>
             <span class="chip"><b>${s.maiorMulti}</b> maior multi</span>
             <span class="chip"><b>${s.rimasInternas}</b> grupos de rima</span>
-            ${r.travadas ? `<span class="chip"><b>${r.travadas}</b> travadas</span>` : ''}
           </div>
         </div>
       </div>
-    </div>
+    </div>`;
+}
 
-    ${vazio ? `<div class="painel aviso">Não ouvi nada. Confira se o microfone certo está selecionado, fale mais perto dele ou tente o modo Whisper.</div>` : ''}
-
+function painelVolta(r, v, i) {
+  const res = v.resultado;
+  const varias = r.voltas.length > 1;
+  const contexto = r.modo === 'tema' ? `<p>Tema: <b>${escapar(r.tema.tema)}</b></p>`
+    : r.modo === 'surpresa' ? `<p>Palavras: ${v.extras.palavrasMostradas.map((p) => `<span class="chip ${v.extras.palavrasUsadas?.includes(p) ? 'usada' : ''}">${escapar(p)}</span>`).join(' ')}</p>`
+    : '';
+  const corpo = v.barras.length ? renderizarAnalise(res.analise) : '<p class="placeholder">Sem transcrição.</p>';
+  return `
     <div class="painel">
-      <h2>Suas barras</h2>
-      ${contexto ? `<p>${contexto}</p>` : ''}
-      ${r.modo === 'ataque' ? `<div class="ataque-cpu" style="margin-bottom:14px">${r.ataque.map((b) => `<p class="lida">${escapar(b)}</p>`).join('')}</div>` : ''}
-      <div class="letra-analisada">${vazio ? '<p class="placeholder">Sem transcrição.</p>' : renderizarAnalise(res.analise)}</div>
-      <div class="legenda"><span>Mesma cor = rima perfeita entre as palavras</span><span>Letra à esquerda = esquema de rima</span><span>Sublinhado = palavra que fecha a barra</span></div>
-      <details style="margin-top:14px">
-        <summary>Corrigir a transcrição e reavaliar</summary>
-        <p class="nota-rodape">O reconhecimento de voz erra às vezes. Corrija as palavras e quebre as barras (uma por linha).</p>
-        <textarea id="texto-corrigir" rows="8">${escapar(r.barras.join('\n'))}</textarea>
-        <div class="acoes"><button class="btn btn-peq" id="btn-reavaliar">Reavaliar</button></div>
+      <div class="volta-titulo"><h2>${varias ? `Volta ${i + 1}` : 'Suas barras'}</h2>${res ? `<span class="volta-nota">${res.nota}</span>` : ''}</div>
+      ${contexto}
+      ${v.ataque ? `<div class="rotulo-bot">Bot</div><div class="ataque-cpu">${v.ataque.map((b) => `<p class="lida">${escapar(b)}</p>`).join('')}</div><div class="rotulo-voce">Você</div>` : ''}
+      <div class="letra-analisada">${corpo}</div>
+      ${res && varias && res.detalhes.length ? `<div class="chips" style="margin-top:10px">${res.detalhes.map((d) => `<span class="chip">${escapar(d)}</span>`).join('')}</div>` : ''}
+      <details style="margin-top:12px" ${!v.barras.length ? 'open' : ''}>
+        <summary>${r.comMic ? 'Corrigir a transcrição' : 'Digitar o que você rimou'}</summary>
+        <textarea class="texto-volta" data-volta="${i}" rows="5" placeholder="Uma barra por linha">${escapar(v.barras.join('\n'))}</textarea>
       </details>
-    </div>
+    </div>`;
+}
 
-    <div class="painel">
+function renderResultado(r, geral) {
+  const el = $('#treino-resultado');
+  const unica = r.voltas.length === 1 ? r.voltas[0].resultado : null;
+  el.innerHTML = `
+    ${painelTopo(r, geral)}
+    ${r.voltas.map((v, i) => painelVolta(r, v, i)).join('')}
+    <div class="acoes-centro" style="margin-top:0"><button class="btn" id="btn-reavaliar">${geral ? 'Reavaliar com as correções' : 'Avaliar'}</button></div>
+    <div class="legenda" style="justify-content:center"><span>Mesma cor = rima perfeita entre as palavras</span><span>Letra à esquerda = esquema de rima</span><span>Sublinhado = palavra que fecha a barra</span></div>
+
+    ${geral ? `<div class="painel" style="margin-top:20px">
       <h2>O que treinar agora</h2>
-      <ul class="dicas">${res.dicas.map((d) => `<li><b>${d.dim}:</b> ${escapar(d.texto)}</li>`).join('')}</ul>
-      ${res.detalhes.length ? `<div class="chips">${res.detalhes.map((d) => `<span class="chip">${escapar(d)}</span>`).join('')}</div>` : ''}
-    </div>
+      <ul class="dicas">${geral.dicas.map((d) => `<li><b>${d.dim}:</b> ${escapar(d.texto)}</li>`).join('')}</ul>
+      ${unica?.detalhes.length ? `<div class="chips">${unica.detalhes.map((d) => `<span class="chip">${escapar(d)}</span>`).join('')}</div>` : ''}
+    </div>` : ''}
 
     ${r.audioUrl ? `<div class="painel"><h2>Ouça sua rodada</h2><audio controls src="${r.audioUrl}" style="width:100%"></audio></div>` : ''}
 
-    <div class="painel" id="painel-juiz">
+    ${geral ? `<div class="painel" id="painel-juiz">
       <h2>Jurado IA <small class="nota-rodape">(opcional)</small></h2>
       ${juiz.temWebGPU()
-        ? `<p>Um modelo de linguagem roda no seu navegador e dá um parecer por escrito, como um jurado. Na primeira vez baixa de 1 a 2 GB.</p>
+        ? `<p>Um modelo de linguagem roda no seu navegador e dá um parecer por escrito, como um jurado. Na primeira vez baixa de 1 a 2,5 GB. Funciona no computador; no celular normalmente não roda.</p>
            <div class="acoes"><button class="btn btn-sec" id="btn-juiz">Chamar o jurado IA</button></div>
            <div id="juiz-area"></div>`
-        : '<p class="nota-rodape">Seu navegador não tem WebGPU, então o jurado IA não está disponível. Ele funciona no Chrome ou Edge atualizados, com placa de vídeo.</p>'}
-    </div>
+        : '<p class="nota-rodape">Seu navegador não tem WebGPU, então o jurado IA não está disponível. Ele funciona no Chrome ou Edge do computador, com placa de vídeo.</p>'}
+    </div>` : ''}
 
     <div class="acoes-centro">
-      <button class="btn btn-grande" id="btn-de-novo">↻ Treinar de novo</button>
+      <button class="btn btn-grande" id="btn-de-novo">↻ ${r.modo === 'batalha' ? 'Nova batalha' : 'Treinar de novo'}</button>
       <button class="btn btn-sec" id="btn-config">Mudar configuração</button>
     </div>`;
 
@@ -466,12 +597,19 @@ function renderResultado(r, res, extras) {
   }));
 
   $('#btn-reavaliar').addEventListener('click', () => {
-    r.barras = $('#texto-corrigir').value.split('\n').map((l) => l.trim()).filter(Boolean);
+    $$('.texto-volta', el).forEach((t) => {
+      r.voltas[Number(t.dataset.volta)].barras = t.value.split('\n').map((l) => l.trim()).filter(Boolean);
+    });
     avaliarEExibir(r);
   });
   $('#btn-de-novo').addEventListener('click', () => comecar(r.cfg));
   $('#btn-config').addEventListener('click', () => mostrarEtapa('treino-config'));
-  $('#btn-juiz')?.addEventListener('click', () => abrirJuiz(r, res));
+  $('#btn-juiz')?.addEventListener('click', () => abrirJuiz(r, geral));
+}
+
+function textoParaJuiz(r) {
+  if (r.voltas.length === 1 && !r.voltas[0].ataque) return r.voltas[0].barras.join('\n');
+  return r.voltas.map((v, i) => `[Volta ${i + 1}]\nBot: ${v.ataque.join(' / ')}\nMC:\n${v.barras.join('\n') || '(sem transcrição)'}`).join('\n\n');
 }
 
 async function abrirJuiz(r, res) {
@@ -506,8 +644,8 @@ async function abrirJuiz(r, res) {
       status.textContent = 'O jurado está escrevendo…';
       const saida = $('#juiz-saida');
       saida.hidden = false;
-      await juiz.julgar({ texto: r.barras.join('\n'), resultado: res, modo: NOMES_MODO[r.modo], contexto: r.tema?.tema }, (t) => { saida.textContent = t; });
-      status.textContent = 'Parecer gerado no seu computador. A IA pode errar: use como opinião, não como verdade.';
+      await juiz.julgar({ texto: textoParaJuiz(r), resultado: res, modo: NOMES_MODO[r.modo], contexto: r.tema?.tema }, (t) => { saida.textContent = t; });
+      status.textContent = 'Parecer gerado no seu aparelho. A IA pode errar: use como opinião, não como verdade.';
     } catch (err) {
       status.textContent = 'Erro no jurado IA: ' + err.message;
     }
