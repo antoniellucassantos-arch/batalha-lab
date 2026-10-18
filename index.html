@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Batalha Lab</title>
+  <meta name="description" content="Treino de freestyle e batalha de rima com reconhecimento de voz e análise de rimas em português.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilo.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111'/%3E%3Crect x='24' y='8' width='16' height='30' rx='8' fill='%23ffd60a'/%3E%3Cpath d='M16 30a16 16 0 0 0 32 0' stroke='%23ffd60a' stroke-width='4' fill='none'/%3E%3Cpath d='M32 46v10' stroke='%23ffd60a' stroke-width='4'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topo">
+    <a class="logo" href="#inicio"><span class="logo-mic">🎤</span> BATALHA<span>LAB</span></a>
+    <button class="menu-btn" id="menu-btn" aria-label="Abrir menu">☰</button>
+    <nav class="nav" id="nav">
+      <a href="#inicio" data-pagina="inicio">Início</a>
+      <a href="#aprender" data-pagina="aprender">Aprender</a>
+      <a href="#treinar" data-pagina="treinar">Treinar</a>
+      <a href="#exercicios" data-pagina="exercicios">Exercícios</a>
+      <a href="#laboratorio" data-pagina="laboratorio">Laboratório</a>
+      <a href="#progresso" data-pagina="progresso">Progresso</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============ INÍCIO ============ -->
+    <section class="pagina" id="inicio">
+      <div class="hero">
+        <div class="hero-texto">
+          <p class="sobretitulo">Treino de freestyle com IA</p>
+          <h1>Solta a voz.<br><span class="destaque">A IA</span> conta as rimas.</h1>
+          <p class="lead">Rima em cima de um beat, o site escuta, transcreve e mostra na hora quais palavras rimaram, onde saiu multissilábica, como foi teu flow e o que treinar a seguir.</p>
+          <div class="hero-acoes">
+            <a class="btn btn-grande" href="#treinar">Começar a treinar</a>
+            <a class="btn btn-sec" href="#aprender">Aprender o básico</a>
+          </div>
+        </div>
+        <div class="hero-demo" aria-hidden="true">
+          <div id="demo-barras"></div>
+          <div class="demo-nota"><b>78</b><span>Pronto pra batalha</span></div>
+        </div>
+      </div>
+
+      <div class="cartoes-3">
+        <a class="cartao link" href="#treinar">
+          <div class="cartao-icone">🎧</div>
+          <h3>Rodadas com beat</h3>
+          <p>Boom bap, trap, lo-fi ou acapella, gerados no navegador. Modos livre, tema sorteado, palavras-surpresa e ataque e resposta contra o computador.</p>
+        </a>
+        <a class="cartao link" href="#exercicios">
+          <div class="cartao-icone">🏋️</div>
+          <h3>Exercícios rápidos</h3>
+          <p>Corrente de rimas, completar a barra, caça de multissilábicas e associação de palavras. 5 minutos por dia já fazem diferença.</p>
+        </a>
+        <a class="cartao link" href="#laboratorio">
+          <div class="cartao-icone">🧪</div>
+          <h3>Laboratório de rimas</h3>
+          <p>Dicionário de rimas pelo som (perfeitas, toantes e multis) e um analisador que colore as rimas de qualquer letra.</p>
+        </a>
+      </div>
+
+      <div class="painel">
+        <h2>Como a IA funciona aqui</h2>
+        <p>Pesquisei repositórios no GitHub atrás de IAs gratuitas para ouvir e avaliar rimas. Não achei nenhuma pronta que avalie rima em português, então o site junta peças gratuitas e de código aberto com um motor de rimas próprio:</p>
+        <div class="tabela-ia">
+          <div><b>Ouvir (tempo real)</b><span>Web Speech API do Chrome/Edge, em pt-BR. Grátis, sem cadastro, mostra a transcrição enquanto você rima.</span></div>
+          <div><b>Ouvir (offline)</b><span><a href="https://github.com/huggingface/transformers.js" target="_blank" rel="noopener">Whisper via Transformers.js</a>, o mesmo projeto do <a href="https://github.com/xenova/whisper-web" target="_blank" rel="noopener">whisper-web</a>. Roda no seu PC, baixa o modelo uma vez e funciona no Firefox também.</span></div>
+          <div><b>Entender a rima</b><span>Motor fonético feito para o português brasileiro: acha a sílaba tônica, converte a escrita em som ("papel" rima com "chapéu", "falar" com "já") e detecta rima perfeita, toante, interna e multissilábica.</span></div>
+          <div><b>Dicionário</b><span>50 mil palavras mais usadas no português do Brasil, do projeto <a href="https://github.com/hermitdave/FrequencyWords" target="_blank" rel="noopener">FrequencyWords</a>.</span></div>
+          <div><b>Jurado IA (opcional)</b><span>Um modelo Qwen rodando no navegador com <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>. Dá um parecer por escrito da tua rodada. Precisa de placa de vídeo com WebGPU.</span></div>
+          <div><b>Também avaliado</b><span><a href="https://github.com/ccoreilly/vosk-browser" target="_blank" rel="noopener">vosk-browser</a> (reconhecimento offline). Ficou de fora porque o modelo pequeno em português erra muito e o grande passa de 1 GB.</span></div>
+        </div>
+        <p class="nota-rodape">Dica de ouro: use fone de ouvido. Com o beat saindo na caixa de som, o microfone capta a batida e o reconhecimento piora.</p>
+      </div>
+    </section>
+
+    <!-- ============ APRENDER ============ -->
+    <section class="pagina" id="aprender">
+      <div class="cabecalho-pagina">
+        <h1>Aprender</h1>
+        <p>O guia de bolso para entrar na roda: como a batalha funciona, o que o público avalia e as técnicas que separam quem trava de quem amassa.</p>
+      </div>
+
+      <nav class="indice">
+        <a href="#ap-o-que">O que é</a><a href="#ap-modalidades">Modalidades</a><a href="#ap-criterios">O que conta ponto</a>
+        <a href="#ap-tecnicas">Técnicas</a><a href="#ap-plano">Plano de 4 semanas</a><a href="#ap-glossario">Glossário</a>
+      </nav>
+
+      <article class="painel" id="ap-o-que">
+        <h2>O que é batalha de rima</h2>
+        <p>Dois MCs se enfrentam improvisando rimas em cima de um beat (ou sem beat, na acapella). Cada um tem um tempo ou um número de compassos para mandar suas barras, alternando ataque e resposta. No fim, quem decide quase sempre é o público, no grito. Em campeonatos maiores pode haver jurados.</p>
+        <p>Não existe uma federação que padronize as regras. Cada batalha cria as suas, mas duas valem em quase todas: <b>a rima tem que ser improvisada</b> (rima decorada pega mal) e <b>não pode ter contato físico</b>. O resto é cultura hip-hop: respeito à roda, ao beat e a quem está segurando o microfone.</p>
+        <p>No Brasil, a Batalha do Real (Rio de Janeiro, 2003) é apontada como a primeira com regras e regularidade. Depois vieram rodas como o Duelo de MCs em Belo Horizonte e a Batalha da Aldeia em Barueri, além de campeonatos nacionais como o Red Bull FrancaMente.</p>
+      </article>
+
+      <article class="painel" id="ap-modalidades">
+        <h2>Modalidades</h2>
+        <div class="grade-2">
+          <div class="mini"><h3>Sangue</h3><p>Ataque pessoal e zoeira. Vale pegar roupa, jeito, o que o oponente falou. Ganha quem tem a punchline mais pesada e a resposta mais rápida.</p></div>
+          <div class="mini"><h3>Conhecimento (temática)</h3><p>Tema sorteado na hora, como política, educação ou favela. Ganha quem desenvolve melhor o assunto, com conteúdo e coerência, sem perder a rima.</p></div>
+          <div class="mini"><h3>Bate-volta</h3><p>Rodadas curtas, uma ou duas barras cada, alternando sem parar. Treina reflexo e resposta imediata.</p></div>
+          <div class="mini"><h3>Palavras ou objetos sorteados</h3><p>O apresentador joga palavras ou mostra objetos e o MC precisa encaixar tudo no verso.</p></div>
+          <div class="mini"><h3>Acapella</h3><p>Sem beat. O MC segura o ritmo sozinho. Revela quem tem flow de verdade.</p></div>
+          <div class="mini"><h3>2x2 e variações</h3><p>Duplas, perguntas e respostas, rimar em outros ritmos (funk, samba, trap)... cada roda inventa a sua.</p></div>
+        </div>
+        <p>Neste site você treina quatro delas: <b>livre</b>, <b>tema</b> (conhecimento), <b>palavras-surpresa</b> e <b>ataque e resposta</b> (o computador manda as barras de sangue e você responde).</p>
+      </article>
+
+      <article class="painel" id="ap-criterios">
+        <h2>O que o público valoriza</h2>
+        <div class="criterios">
+          <div><b>Rima</b><p>Todas as barras fechando com rima, de preferência perfeita e não repetida.</p></div>
+          <div><b>Punchline</b><p>A frase de impacto que faz a roda gritar. Geralmente vem no fim de um par de barras.</p></div>
+          <div><b>Resposta</b><p>Rebater o que o oponente acabou de dizer prova que é improviso. É o que mais levanta a plateia.</p></div>
+          <div><b>Flow e encaixe</b><p>Estar no tempo do beat, com a rima caindo no tempo forte, sem atropelar nem sobrar.</p></div>
+          <div><b>Complexidade</b><p>Multissilábicas, rimas internas, trocadilhos, duplo sentido.</p></div>
+          <div><b>Presença</b><p>Voz firme, postura, olho no olho, interação com o público.</p></div>
+        </div>
+        <p class="nota-rodape">A nota do treino segue a mesma lógica: Rima (35%), Complexidade (20%), Vocabulário (15%), Flow (15%) e Desafio (15%, que é usar o tema, as palavras ou rebater o ataque).</p>
+      </article>
+
+      <article class="painel" id="ap-tecnicas">
+        <h2>Técnicas essenciais</h2>
+
+        <div class="tecnica">
+          <h3>1. Perfeita, toante e multissilábica</h3>
+          <p><b>Rima perfeita</b>: o som é igual da vogal tônica até o fim. <i>rima / cima / clima</i>, <i>papel / chapéu</i>.<br>
+          <b>Rima toante</b>: só as vogais batem. <i>casa / mala</i>, <i>vida / clima</i>. Funciona bem quando cantada, mas pesa menos que a perfeita.<br>
+          <b>Multissilábica (multi)</b>: várias sílabas seguidas batendo. <i>"batalha de rima"</i> com <i>"navalha que mira"</i>. É o que impressiona.</p>
+        </div>
+
+        <div class="tecnica">
+          <h3>2. Pense no fim primeiro</h3>
+          <p>O maior segredo do improviso: enquanto fala a barra 1, já escolha a palavra que vai fechar a barra 2. Depois só construa o caminho até ela. Exemplo: você fechou com <i>"estrada"</i>. Antes de terminar, sua cabeça já pegou <i>"jornada"</i>, e a barra 2 nasce em volta disso.</p>
+        </div>
+
+        <div class="tecnica">
+          <h3>3. Famílias de rima (seu banco)</h3>
+          <p>Todo MC tem um repertório de terminações que domina. Estude as famílias mais comuns até elas saírem no automático: <b>-ão</b> (missão, visão, razão), <b>-ado</b> (passado, pesado, lado), <b>-ente</b> (mente, frente, gente), <b>-ia</b> (dia, poesia, magia), <b>-or</b> (dor, calor, valor), <b>-eiro</b> (primeiro, dinheiro, guerreiro). Depois procure as raras: plateia gosta de surpresa.</p>
+        </div>
+
+        <div class="tecnica">
+          <h3>4. Rima interna</h3>
+          <p>Coloque rimas no meio da barra, não só no fim: <i>"eu trago o <u>fogo</u>, no meu <u>jogo</u> tu chega <u>logo</u>"</i>. Deixa o verso denso e mostra controle.</p>
+        </div>
+
+        <div class="tecnica">
+          <h3>5. Punchline: preparação + virada</h3>
+          <p>A barra 1 prepara, a barra 2 vira o jogo. <i>"Tu diz que é leão, que é rei da selva inteira / mas na hora da rima tu mia igual gatinho de feira"</i>. Guarde a palavra mais forte para o final.</p>
+        </div>
+
+        <div class="tecnica">
+          <h3>6. Responda na rima do oponente</h3>
+          <p>Pegue a última palavra que ele falou e use como sua rima. Se ele terminou com <i>"coroa"</i>, você abre com <i>"falou de coroa mas tua rima é à toa"</i>. Isso prova improviso e sempre levanta a roda.</p>
+        </div>
+
+        <div class="tecnica">
+          <h3>7. Use o que está na sua frente</h3>
+          <p>Roupa do oponente, o lugar, o público, o que aconteceu na rodada anterior, a notícia da semana. É conteúdo grátis, ninguém duvida que é improviso e conecta com quem está assistindo.</p>
+        </div>
+
+        <div class="tecnica">
+          <h3>8. Encaixe e respiração</h3>
+          <p>A sílaba tônica da rima deve cair no tempo forte (normalmente junto com a caixa, no 2 e no 4). Respire no fim de cada par de barras. Se travar, não pare: segure o ritmo com uma frase-ponte e volte para a rima. Silêncio é o que mais derruba na roda.</p>
+        </div>
+
+        <div class="tecnica">
+          <h3>9. Grave e ouça</h3>
+          <p>Ouvir a própria gravação é chato, mas é onde aparecem os vícios: palavra repetida, rima pobre, flow atrasado. Toda rodada aqui fica gravada para você ouvir de novo.</p>
+        </div>
+      </article>
+
+      <article class="painel" id="ap-plano">
+        <h2>Plano de 4 semanas (20 a 30 min por dia)</h2>
+        <div class="plano">
+          <div><span class="semana">Semana 1</span><h3>Destravar</h3><p>Associação livre (5 min), corrente de rimas (10 min), freestyle livre no boom bap a 85 BPM (10 min). Meta: não parar de falar, mesmo rimando pouco.</p></div>
+          <div><span class="semana">Semana 2</span><h3>Fechar as barras</h3><p>Completar a barra (10 min), freestyle com tema (10 min), ouvir a gravação (5 min). Meta: nota de Rima acima de 60.</p></div>
+          <div><span class="semana">Semana 3</span><h3>Complexidade</h3><p>Caça de multissilábicas (10 min), palavras-surpresa (10 min), laboratório de rimas (5 min). Meta: pelo menos uma multi de 3+ por rodada.</p></div>
+          <div><span class="semana">Semana 4</span><h3>Modo batalha</h3><p>Ataque e resposta (15 min), trap a 140 BPM e acapella (10 min). Meta: responder rimando com o ataque em toda rodada.</p></div>
+        </div>
+      </article>
+
+      <article class="painel" id="ap-glossario">
+        <h2>Glossário</h2>
+        <dl class="glossario">
+          <dt>Barra</dt><dd>Uma linha do verso, normalmente um compasso do beat.</dd>
+          <dt>Compasso</dt><dd>4 tempos do beat. No boom bap a 90 BPM dura cerca de 2,7 segundos.</dd>
+          <dt>Flow</dt><dd>O jeito de encaixar as palavras no ritmo: velocidade, pausas, acentos.</dd>
+          <dt>Punchline</dt><dd>Barra de impacto, a "pancada" que faz a plateia reagir.</dd>
+          <dt>Multi</dt><dd>Rima multissilábica, quando várias sílabas batem.</dd>
+          <dt>Rima interna</dt><dd>Rima dentro da barra, não só no fim.</dd>
+          <dt>Rima pronta</dt><dd>Verso decorado usado como se fosse improviso. Mal visto na roda.</dd>
+          <dt>Travar</dt><dd>Ficar sem palavra no meio do round.</dd>
+          <dt>Sangue</dt><dd>Modalidade de ataque pessoal.</dd>
+          <dt>Conhecimento</dt><dd>Modalidade com tema sorteado.</dd>
+          <dt>BPM</dt><dd>Batidas por minuto, a velocidade do beat.</dd>
+          <dt>Tônica</dt><dd>A sílaba mais forte da palavra. É dela até o fim que a rima precisa bater.</dd>
+        </dl>
+      </article>
+
+      <article class="painel fontes">
+        <h2>Fontes da pesquisa</h2>
+        <ul>
+          <li><a href="https://www.redbull.com/br-pt/musica-batalha-de-rima-dicas" target="_blank" rel="noopener">Red Bull Brasil: dicas para batalha de rima</a></li>
+          <li><a href="https://www.redbull.com/pt-pt/rap-freestyle-guia-principiantes" target="_blank" rel="noopener">Red Bull Portugal: guia de freestyle para principiantes</a></li>
+          <li><a href="https://ojs.uel.br/revistas/uel/index.php/boitata/article/download/31742/22204/145348" target="_blank" rel="noopener">Revista Boitatá (UEL): artigo sobre batalhas de rima</a></li>
+          <li><a href="https://billboard.com.br/79910-2/" target="_blank" rel="noopener">Billboard Brasil: batalhas de rima explodem em popularidade</a></li>
+          <li><a href="https://maquinadoesporte.com.br/analise/batalha-de-rima-o-esporte-da-musica/" target="_blank" rel="noopener">Máquina do Esporte: batalha de rima, o esporte da música</a></li>
+          <li><a href="https://www.skillshare.com/classes/How-To-Freestyle-Rap-Rhythm-Lyrics-Delivery/102501447" target="_blank" rel="noopener">Skillshare: How to Freestyle Rap (multissilábicas)</a></li>
+        </ul>
+      </article>
+    </section>
+
+    <!-- ============ TREINAR ============ -->
+    <section class="pagina" id="treinar">
+      <div id="treino-config">
+        <div class="cabecalho-pagina">
+          <h1>Treinar</h1>
+          <p>Escolha o modo, o beat e solta a voz. Quando o tempo acabar, sai a nota.</p>
+        </div>
+
+        <div class="modos" role="radiogroup" aria-label="Modo de treino">
+          <label class="modo"><input type="radio" name="modo" value="livre" checked><span class="modo-icone">🎤</span><b>Livre</b><small>Rima sobre o que vier na cabeça.</small></label>
+          <label class="modo"><input type="radio" name="modo" value="tema"><span class="modo-icone">🎯</span><b>Tema</b><small>Um tema sorteado, como na batalha de conhecimento.</small></label>
+          <label class="modo"><input type="radio" name="modo" value="surpresa"><span class="modo-icone">⚡</span><b>Palavras-surpresa</b><small>Uma palavra nova a cada 2 compassos. Encaixa todas.</small></label>
+          <label class="modo"><input type="radio" name="modo" value="ataque"><span class="modo-icone">🥊</span><b>Ataque e resposta</b><small>O computador manda 4 barras de sangue. Você responde.</small></label>
+        </div>
+
+        <div class="painel config">
+          <div class="campo">
+            <label for="cfg-estilo">Beat</label>
+            <select id="cfg-estilo"></select>
+          </div>
+          <div class="campo">
+            <label for="cfg-bpm">Velocidade: <b id="cfg-bpm-valor">90</b> BPM</label>
+            <input type="range" id="cfg-bpm" min="70" max="160" value="90">
+          </div>
+          <div class="campo">
+            <label for="cfg-duracao">Duração</label>
+            <select id="cfg-duracao">
+              <option value="30">30 segundos</option>
+              <option value="45" selected>45 segundos</option>
+              <option value="60">1 minuto</option>
+              <option value="90">1 min 30</option>
+              <option value="120">2 minutos</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="cfg-volume">Volume do beat</label>
+            <input type="range" id="cfg-volume" min="0" max="100" value="70">
+          </div>
+          <div class="campo">
+            <label for="cfg-motor">Reconhecimento de voz</label>
+            <select id="cfg-motor">
+              <option value="navegador">Navegador (tempo real)</option>
+              <option value="whisper">Whisper (offline)</option>
+            </select>
+          </div>
+          <div class="campo" id="campo-whisper" hidden>
+            <label for="cfg-whisper">Modelo Whisper</label>
+            <select id="cfg-whisper"></select>
+          </div>
+        </div>
+        <p class="aviso" id="aviso-voz" hidden></p>
+        <div class="acoes-centro">
+          <button class="btn btn-grande" id="btn-comecar">▶ Começar rodada</button>
+        </div>
+        <p class="nota-rodape centro">Use fone de ouvido para o microfone não captar o beat.</p>
+      </div>
+
+      <div id="treino-palco" class="palco" hidden>
+        <div class="palco-topo">
+          <div class="relogio" id="relogio">0:45</div>
+          <div class="pulso" id="pulso"><i></i><i></i><i></i><i></i></div>
+          <div class="info-compasso" id="info-compasso">compasso 1</div>
+          <div class="medidor" title="Volume do microfone"><span id="medidor-mic"></span></div>
+        </div>
+        <div class="estimulo" id="estimulo"></div>
+        <div class="contagem" id="contagem" hidden></div>
+        <div class="ao-vivo" id="ao-vivo"><p class="placeholder">A transcrição aparece aqui enquanto você rima…</p></div>
+        <div class="acoes-centro">
+          <button class="btn btn-perigo" id="btn-parar">■ Parar e avaliar</button>
+          <button class="btn btn-sec" id="btn-cancelar">Cancelar</button>
+        </div>
+      </div>
+
+      <div id="treino-processando" class="painel centro" hidden>
+        <div class="spinner"></div>
+        <p id="processando-texto">Analisando suas rimas…</p>
+        <div class="barra-progresso"><span id="processando-barra"></span></div>
+      </div>
+
+      <div id="treino-resultado" hidden></div>
+    </section>
+
+    <!-- ============ EXERCÍCIOS ============ -->
+    <section class="pagina" id="exercicios">
+      <div class="cabecalho-pagina">
+        <h1>Exercícios</h1>
+        <p>Treinos curtos para destravar a mente. Fale no microfone ou digite.</p>
+      </div>
+      <div class="cartoes-exercicios" id="lista-exercicios">
+        <button class="cartao link" data-ex="corrente"><div class="cartao-icone">⛓️</div><h3>Corrente de rimas</h3><p>Uma palavra, 30 segundos: fale o máximo de rimas que conseguir. Rima perfeita vale 3 pontos, toante vale 1.</p></button>
+        <button class="cartao link" data-ex="completar"><div class="cartao-icone">✍️</div><h3>Completa a barra</h3><p>Aparece a primeira barra, você manda a segunda rimando e com tamanho parecido.</p></button>
+        <button class="cartao link" data-ex="multi"><div class="cartao-icone">🧩</div><h3>Caça multissilábica</h3><p>Uma frase-alvo e o padrão de vogais dela. Crie frases que batam o maior número de sílabas.</p></button>
+        <button class="cartao link" data-ex="associacao"><div class="cartao-icone">💭</div><h3>Associação livre</h3><p>Aquecimento: uma palavra e 45 segundos para falar tudo que vier à cabeça, sem parar.</p></button>
+      </div>
+      <div id="area-exercicio"></div>
+    </section>
+
+    <!-- ============ LABORATÓRIO ============ -->
+    <section class="pagina" id="laboratorio">
+      <div class="cabecalho-pagina">
+        <h1>Laboratório de rimas</h1>
+        <p>Encontre rimas pelo som e veja as rimas de qualquer letra coloridas.</p>
+      </div>
+
+      <div class="painel">
+        <h2>Dicionário de rimas</h2>
+        <form class="busca" id="form-dicionario">
+          <input type="text" id="busca-palavra" placeholder="Digite uma palavra, ex: batalha" autocomplete="off">
+          <button class="btn" type="submit">Buscar rimas</button>
+        </form>
+        <p class="nota-rodape" id="status-dicionario">Carregando dicionário…</p>
+        <div id="resultado-dicionario"></div>
+      </div>
+
+      <div class="painel">
+        <h2>Analisador de letra</h2>
+        <p>Cole uma letra ou um freestyle (uma barra por linha). As palavras que rimam ganham a mesma cor.</p>
+        <textarea id="texto-analisar" rows="8" placeholder="Cheguei na roda com a mente afiada&#10;tua rima é fraca, já tá derrotada&#10;eu trago o fogo, tu traz o lamento&#10;no meu jogo tu é só um momento"></textarea>
+        <div class="acoes"><button class="btn" id="btn-analisar">Analisar</button></div>
+        <div id="resultado-analise"></div>
+      </div>
+    </section>
+
+    <!-- ============ PROGRESSO ============ -->
+    <section class="pagina" id="progresso">
+      <div class="cabecalho-pagina">
+        <h1>Progresso</h1>
+        <p>Suas rodadas ficam salvas neste navegador.</p>
+      </div>
+      <div id="conteudo-progresso"></div>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <p>Batalha Lab · tudo roda no seu navegador · feito para treinar, a roda é que dá o veredito.</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
